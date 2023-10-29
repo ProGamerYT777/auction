@@ -1,0 +1,309 @@
+openapi: 3.0.3
+info:
+  title: Простой API аукциона
+  description: |-
+    API для простой системы аукциона под названием "Easy auction".
+    API включает создание и изменение лотов,
+    некоторые функции агрегации и простую систему ставок.
+  version: 1.0.0
+servers:
+  - url: 'https://localhost:8080'
+tags:
+  - name: Lots
+    description: Operations with lots
+paths:
+  /lot/{id}/first:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+    get:
+      tags:
+        - Lots
+      summary: Получить информацию о первом ставившем на лот
+      description: Возвращает первого ставившего на этот лот
+      operationId: getFirstBidder
+      responses:
+        '200':
+          description: Имя первого ставившего и дата первой ставки
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Bid'
+        '404':
+          description: Лот не найден
+  /lot/{id}/frequent:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+    get:
+      tags:
+        - Lots
+      summary: Возвращает имя ставившего на данный лот наибольшее количество раз
+      description: Наибольшее количество вычисляется из общего количества ставок на лот
+      operationId: getMostFrequentBidder
+      responses:
+        '200':
+          description: Имя первого ставившего и дата его последней ставки
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Bid'
+        '404':
+          description: Лот не найден
+  /lot/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+    get:
+      tags:
+        - Lots
+      summary: Получить полную информацию о лоте
+      description: Возвращает полную информацию о лоте с последним ставившим и текущей ценой
+      operationId: getFullLot
+      responses:
+        '200':
+          description: Полный лот по идентификатору
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FullLot'
+        '404':
+          description: Лот не найден
+  /lot/{id}/start:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+    post:
+      tags:
+        - Lots
+      summary: Начать торги по лоту
+      description: |-
+        Переводит лот в состояние "начато", которое позволяет делать ставки на лот.
+        Если лот уже находится в состоянии "начато", то ничего не делает и возвращает 200
+      responses:
+        '200':
+          description: Лот переведен в статус начато
+        '404':
+          description: Лот не найден
+  /lot/{id}/bid:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+    post:
+      tags:
+        - Lots
+      summary: Сделать ставку по лоту
+      description: |-
+        Создает новую ставку по лоту.
+        Если лот в статусе CREATED или STOPPED, то должна вернутся ошибка
+      operationId: createBid
+      requestBody:
+        required: true
+        description: Объект с именем ставившего на лот
+        content:
+          application/json:
+            schema:
+              properties:
+                name:
+                  type: string
+      responses:
+        '200':
+          description: Ставка создана
+        '400':
+          description: Лот в неверном статусе
+        '404':
+          description: Лот не найден
+  /lot/{id}/stop:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+    post:
+      tags:
+        - Lots
+      summary: Остановить торги по лоту
+      description: |-
+        Переводит лот в состояние "остановлен", которое запрещает делать ставки на лот.
+        Если лот уже находится в состоянии "остановлен", то ничего не делает и возвращает 200
+      responses:
+        '200':
+          description: Лот перемещен в статус остановлен
+        '404':
+          description: Лот не найден
+  /lot:
+    post:
+      tags:
+        - Lots
+      summary: Создает новый лот
+      description: |-
+        Метод создания нового лота,
+        если есть ошибки в полях объекта лота - то нужно вернуть статус с ошибкой
+      operationId: createLot
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateLot'
+        required: true
+      responses:
+        '200':
+          description: Лот успешно создан
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Lot'
+        '400':
+          description: Лот передан с ошибкой
+    get:
+      tags:
+        - Lots
+      summary: Получить все лоты, основываясь на фильтре статуса и номере страницы
+      description: |-
+        Возвращает все записи о лотах без информации о текущей цене и победителе
+        постранично.
+        Если страница не указана, то возвращается первая страница.
+        Номера страниц начинаются с 0.
+        Лимит на количество лотов на странице - 10 штук.
+      operationId: findLots
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum:
+              - STARTED
+              - STOPPED
+              - CREATED
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 0
+      responses:
+        '200':
+          description: Список лотов
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Lot'
+  /lot/export:
+    get:
+      tags:
+        - Lots
+      summary: Экспортировать все лоты в файл CSV
+      description: |-
+        Экспортировать все лоты в формате
+        id,title,status,lastBidder,currentPrice
+        в одном файле CSV
+      operationId: getCSVFile
+      responses:
+        '200':
+          description: CSV Report
+          content:
+            application/csv:
+              schema:
+                type: string
+                format: binary
+components:
+  schemas:
+    CreateLot:
+      type: object
+      required:
+        - title
+        - description
+        - startPrice
+        - bidPrice
+      properties:
+        title:
+          type: string
+          minLength: 3
+          maxLength: 64
+          example: Chinese Vase
+        description:
+          type: string
+          minLength: 1
+          maxLength: 4096
+          example: Chinese Vase of Ming dynasty
+        startPrice:
+          type: integer
+          minimum: 1
+          description: Начальная цена лота
+          example: 100
+        bidPrice:
+          type: integer
+          minimum: 1
+          description: Цена каждой новой ставки по лоту
+          example: 100
+    Lot:
+      allOf:
+        - type: object
+          required:
+            - id
+            - status
+          properties:
+            id:
+              type: integer
+              format: int64
+              example: 10
+            status:
+              description: |-
+                Текущий статус лота, не может быть null
+                Изначально лот находится в статусе CREATED
+              type: string
+              enum:
+                - STARTED
+                - STOPPED
+                - CREATED
+        - $ref: '#/components/schemas/CreateLot'
+    FullLot:
+      description: |-
+        Полная информация о лоте, с учетом текущей цены
+        Для подсчета текущей цены нужно сложить все текущие ставки
+        то есть если было 10 ставок то текущая цена высчитывается по формуле
+        10 * bidPrice + startPrice
+      allOf:
+        - $ref: '#/components/schemas/Lot'
+        - type: object
+          required:
+            - currentPrice
+          properties:
+            currentPrice:
+              type: integer
+              description: |-
+                Текущая цена по лоту, 
+                если торги по лоту еще не начаты - то подставляется стартовая цена
+            lastBid:
+              $ref: '#/components/schemas/Bid'
+    Bid:
+      type: object
+      description: |-
+        Информация о ставке на лот
+      properties:
+        bidderName:
+          type: string
+          description: Имя человека ставившего на лот
+        bidDate:
+          type: string
+          format: date-time
+          description: Дата и время приема ставки
