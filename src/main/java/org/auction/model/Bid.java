@@ -39,7 +39,6 @@ public class Bid {
         this.lot = lot;
     }
 
-
     @Override
     public final boolean equals(Object o) {
         if (this == o) return true;
