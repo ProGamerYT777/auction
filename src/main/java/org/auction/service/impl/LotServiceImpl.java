@@ -3,6 +3,8 @@ package org.auction.service.impl;
 
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import org.apache.commons.csv.CSVFormat;
+import org.apache.commons.csv.CSVPrinter;
 import org.auction.dto.LotDto;
 import org.auction.mapper.LotMapper;
 import org.auction.model.Lot;
@@ -21,6 +23,8 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.io.StringWriter;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -123,37 +127,28 @@ public class LotServiceImpl implements LotService {
     }
 
     @Override
-    @Transactional(readOnly = true)
-    public void exportLotsToCSV(HttpServletResponse response) {
-        List<Lot> lots = lotRepository.findAll();
+    public byte[] exportLotsToCSV() {
+        StringWriter stringWriter = new StringWriter();
 
-        if (lots.isEmpty()) {
-            throw new ResponseStatusException(HttpStatus.NO_CONTENT, "Нет лотов для экспорта");
-        }
+        CSVFormat csvFormat = CSVFormat.DEFAULT.builder()
+                .setHeader("id", "title", "status", "lastBidder", "currentPrice")
+                .build();
 
-        try {
-
-            response.setContentType("text/csv");
-            response.setHeader("Content-Disposition", "attachment; filename=lots.csv");
-
-            PrintWriter writer = response.getWriter();
-
-            writer.println("id,title,status,lastBidder,currentPrice");
-
-            for (Lot Lot : lots) {
-                String currentPrice = String.valueOf(getCurrentPrice(Lot.getId()));
-                String lastBidder = bidService.getLastBid(Lot.getId()).getBidderName();
-
-                writer.println(
-                        Lot.getId() + "," +
-                                Lot.getTitle() + "," +
-                                Lot.getStatus().name() + "," +
-                                lastBidder + "," +
-                                currentPrice
-                );
-            }
-
-            writer.close();
+        try(CSVPrinter csvPrinter = new CSVPrinter(stringWriter, csvFormat)) {
+            lotRepository.getLotsForExport().forEach(tuple -> {
+                try {
+                    csvPrinter.printRecord(
+                            tuple.get("id", Long.class),
+                            tuple.get("title", String.class),
+                            LotStatus.valueOf(tuple.get("status", String.class)),
+                            tuple.get("lastBidder", String.class),
+                            tuple.get("currentPrice", Integer.class)
+                    );
+                } catch (IOException e) {
+                    throw new RuntimeException("Нет лотов для экспорта", e);
+                }
+            });
+            return stringWriter.toString().getBytes(StandardCharsets.UTF_8);
         } catch (IOException e) {
             throw new RuntimeException("Ошибка экспорта csv файла", e);
         }

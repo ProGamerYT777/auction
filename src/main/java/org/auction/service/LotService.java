@@ -19,5 +19,5 @@ public interface LotService {
 
     List<LotDto> getLotsByStatusAndPage(String status, int page);
 
-    void exportLotsToCSV(HttpServletResponse response);
+    byte[] exportLotsToCSV();
 }
