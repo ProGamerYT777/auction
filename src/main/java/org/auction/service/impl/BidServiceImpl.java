@@ -63,8 +63,13 @@ public class BidServiceImpl implements BidService {
 
     @Override
     public BidDto getMostFrequentBidder(Long lotId) {
+        Optional<Bid> mostFrequentBidder = bidRepository.findTheMostFrequentBidder(lotId);
 
-        return null;
+        if (mostFrequentBidder.isPresent()) {
+            return bidMapper.toDto(mostFrequentBidder.get());
+        } else {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Ставок ещё не было");
+        }
     }
 
     @Override

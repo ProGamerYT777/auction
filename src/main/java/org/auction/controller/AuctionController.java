@@ -67,7 +67,7 @@ public class AuctionController {
     }
 
     @GetMapping("/export")
-    public void exportLotsToCSV(HttpServletResponse response) {
-        lotService.exportLotsToCSV(response);
+    public byte[] exportLotsToCSV() {
+       return lotService.exportLotsToCSV();
     }
 }
